@@ -132,6 +132,7 @@ Ready-to-use manifests for all supported node types are available in the [exampl
 - [Horizon API](examples/horizon.yaml) - Scalable REST API server with Ingress and ingestion.
 - [Soroban RPC](examples/soroban-rpc.yaml) - Smart contract execution node with autoscaling.
 - [Disaster Recovery Setup](examples/dr-setup.yaml) - Multi-cluster HA configuration with automated drills.
+- [ArgoCD GitOps deployment guide](docs/gitops/argocd.mdx) - Versioned, declarative Testnet Validator and Soroban RPC golden path.
 
 ---
 
