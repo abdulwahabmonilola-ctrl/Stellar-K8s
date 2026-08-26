@@ -192,15 +192,22 @@ spec:
                       type: boolean
                 sorobanConfig:
                   type: object
+                  x-kubernetes-preserve-unknown-fields: true
                   properties:
                     stellarCoreUrl:
                       type: string
                     captiveCoreConfig:
                       type: string
+                    captiveCoreStructuredConfig:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     enablePreflight:
                       type: boolean
                     maxEventsPerRequest:
                       type: integer
+                autoscaling:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
                     cache:
                       type: object
                       description: Bounded fail-open cache for read-only Soroban RPC state requests
