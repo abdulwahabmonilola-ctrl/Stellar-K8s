@@ -1,0 +1,81 @@
+# recovery-mode-validator.yaml
+# Recovery Mode for a Stellar Core Validator (#22).
+#
+# Apply BEFORE touching data in a disaster-recovery scenario. It:
+#   1. Bypasses normal readiness/liveness gating (high failureThreshold) so the
+#      operator leaves the pod alone while you diagnose.
+#   2. Optionally suspends the node (scaled to 0) so it cannot sign or fork.
+#   3. Optionally bootstraps from a known-good CSI VolumeSnapshot.
+#
+# After recovery, remove maintenanceMode and the probe overrides (see
+# docs/operations/disaster-recovery.md).
+
+apiVersion: stellar.org/v1alpha1
+kind: StellarNode
+metadata:
+  name: validator-recovery
+  namespace: stellar
+spec:
+  nodeType: Validator
+  network: Mainnet
+  version: "v21.0.0"
+
+  # Recovery Mode: the operator keeps the object but does not mark it Ready.
+  maintenanceMode: true
+
+  # Optional: scale to 0 while you inspect the data volume.
+  suspended: true
+
+  # Bypass the standard probes so an unhealthy-but-present pod is not restarted
+  # or killed mid-diagnosis. Remove after recovery.
+  probes:
+    readiness:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      successThreshold: 1
+      failureThreshold: 100
+    liveness:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 100
+
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+
+  storage:
+    mode: PersistentVolume
+    storageClass: "ssd-premium"
+    size: "500Gi"
+    retentionPolicy: Retain
+
+  # Optional (Scenario 2 / Option A): bootstrap from a known-good snapshot
+  # instead of an empty volume. The snapshot must exist in this namespace.
+  # restoreFromSnapshot:
+  #   volumeSnapshotName: <node>-data-20250224-020000
+
+  validatorConfig:
+    # IMPORTANT: keep the SAME seed as the node you are recovering, otherwise
+    # the validator's Stellar identity (and signing key) changes.
+    seedSecretRef: validator-seed-mainnet
+
+    enableHistoryArchive: true
+    historyArchiveUrls:
+      - "https://history.stellar.org/prd/core-live/core_live_001"
+      - "https://history.stellar.org/prd/core-live/core_live_002"
+
+    quorumSet: |
+      [QUORUM_SET]
+      THRESHOLD_PERCENT=67
+      VALIDATORS=[
+        "$sdf1", "$sdf2", "$sdf3",
+        "$tieron_1", "$tieron_2", "$tieron_3"
+      ]
+
+  alerting: false
