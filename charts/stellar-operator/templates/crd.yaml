@@ -208,6 +208,7 @@ spec:
                 autoscaling:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+                  properties:
                     cache:
                       type: object
                       description: Bounded fail-open cache for read-only Soroban RPC state requests

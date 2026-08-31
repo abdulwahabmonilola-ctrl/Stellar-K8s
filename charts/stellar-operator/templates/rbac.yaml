@@ -99,6 +99,8 @@ kind: RoleBinding
 metadata:
   name: {{ include "stellar-operator.fullname" . }}
   namespace: {{ .Values.watchNamespace }}
+  labels:
+    {{- include "stellar-operator.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -107,13 +109,13 @@ roleRef:
 kind: ClusterRoleBinding
 metadata:
   name: {{ include "stellar-operator.fullname" . }}
+  labels:
+    {{- include "stellar-operator.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: {{ include "stellar-operator.fullname" . }}
 {{- end }}
-  labels:
-    {{- include "stellar-operator.labels" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
     name: {{ include "stellar-operator.serviceAccountName" . }}

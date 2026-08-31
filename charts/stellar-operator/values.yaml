@@ -107,6 +107,10 @@ arch: ""
 # PodDisruptionBudget configuration for operator deployment
 podDisruptionBudget:
   enabled: false
+  # Only takes effect once enabled: true. Without a default here, enabling
+  # the PDB would render neither minAvailable nor maxUnavailable, producing
+  # a no-op PodDisruptionBudget.
+  minAvailable: 1
 
 # Operator configuration
 operator:
@@ -196,7 +200,6 @@ defaultResources:
     limits:
       cpu: "4"
       memory: "8Gi"
-      
 
 # Feature flags — toggle operator capabilities at runtime without restart.
 featureFlags:

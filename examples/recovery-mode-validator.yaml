@@ -1,14 +1,34 @@
 # recovery-mode-validator.yaml
 # Recovery Mode for a Stellar Core Validator (#22).
 #
-# Apply BEFORE touching data in a disaster-recovery scenario. It:
+# See docs/operations/disaster-recovery.md for the full runbook this
+# supports. Read that doc's "Recovery Mode manifest" section first —
+# by default Stellar-K8s pods have NO Kubernetes-native readiness probe
+# at all (apply_probe_override in src/controller/resources.rs only emits
+# one when spec.probes is set), so there is nothing to "bypass" unless
+# you previously opted into custom probes yourself.
+#
+# This example is for that opt-in case: you already set strict
+# spec.probes.readiness/liveness thresholds (e.g. to gate a Service or a
+# PodDisruptionBudget on them), and need to relax them temporarily so
+# kubelet doesn't kill/exclude a pod that is legitimately mid multi-hour
+# catchup (see historyMode: Full in the disaster-recovery runbook,
+# Scenario 2/3).
+#
+# Apply BEFORE touching data in a disaster-recovery scenario. This manifest:
 #   1. Bypasses normal readiness/liveness gating (high failureThreshold) so the
 #      operator leaves the pod alone while you diagnose.
 #   2. Optionally suspends the node (scaled to 0) so it cannot sign or fork.
 #   3. Optionally bootstraps from a known-good CSI VolumeSnapshot.
 #
-# After recovery, remove maintenanceMode and the probe overrides (see
-# docs/operations/disaster-recovery.md).
+# This is a full StellarNode example (apply with `kubectl apply -f`, like
+# the other manifests in this directory) — copy the `probes`/`historyMode`
+# fields onto your existing node's spec rather than applying this file as-is
+# if your node has a different name. Reapply your normal strict probe config
+# once `kubectl stellar status` reports Synced again.
+#
+# After recovery, remove maintenanceMode, suspended, and the probe overrides
+# (see docs/operations/disaster-recovery.md).
 
 apiVersion: stellar.org/v1alpha1
 kind: StellarNode
@@ -26,8 +46,16 @@ spec:
   # Optional: scale to 0 while you inspect the data volume.
   suspended: true
 
-  # Bypass the standard probes so an unhealthy-but-present pod is not restarted
-  # or killed mid-diagnosis. Remove after recovery.
+  # Forces a full replay from history archives on the next fresh volume —
+  # see disaster-recovery.md Scenario 2/3 for when this applies. Leave as
+  # "Recent" if you're only relaxing probes without also forcing a full
+  # resync.
+  historyMode: Full
+
+  # Relaxed probe overrides: high failure threshold so kubelet tolerates
+  # "not yet ready" during recovery instead of restart-looping the pod or
+  # pulling it out of a Service's endpoints. These fields only ever override —
+  # the operator generates no probe at all if you omit `probes` entirely.
   probes:
     readiness:
       initialDelaySeconds: 10
@@ -52,8 +80,8 @@ spec:
   storage:
     mode: PersistentVolume
     storageClass: "ssd-premium"
-    size: "500Gi"
-    retentionPolicy: Retain
+    size: "500Gi" # adjust per capacity-planning.md; Full-history examples in the runbook use 1500Gi
+    retentionPolicy: Retain # never Delete on a node you're actively recovering
 
   # Optional (Scenario 2 / Option A): bootstrap from a known-good snapshot
   # instead of an empty volume. The snapshot must exist in this namespace.
@@ -79,3 +107,20 @@ spec:
       ]
 
   alerting: false
+
+# Expected behavior:
+#
+# 1. With maintenanceMode: true and suspended: true, the node is not marked
+#    Ready and the workload is scaled to 0 while you inspect or wipe the PVC.
+#    Omit/remove those fields if you want the workload to keep running during
+#    a resync.
+# 2. Any readinessProbe/livenessProbe on the main container gets the
+#    thresholds above instead of the default of no probe at all.
+# 3. historyMode: Full means a fresh PVC replays from genesis
+#    (CATCHUP_COMPLETE=true) — expect CatchingUp for hours to days
+#    depending on network age, not a normal restart's few minutes.
+#
+# To exit recovery mode: patch `probes` back to your normal strict
+# values (or remove the field to return to "no native probe"), set
+# historyMode back to "Recent" if you only needed it for this one resync,
+# and remove maintenanceMode/suspended.
